@@ -31,8 +31,9 @@ class Settings:
     # Embeddings (OpenAI-compatible API, SiliconFlow by default)
     embedding_api_key: str | None = None
     embedding_base_url: str = "https://api.siliconflow.cn/v1"
-    embedding_model: str = "Qwen/Qwen3-Embedding-8B"
+    embedding_model: str = "Qwen/Qwen3-VL-Embedding-8B"
     embedding_dimensions: int = 1024
+    embedding_timeout_seconds: float = 10.0
 
     @property
     def oauth_enabled(self) -> bool:
@@ -55,4 +56,7 @@ def load_settings() -> Settings:
         embedding_base_url=env("EMBEDDING_BASE_URL", defaults.embedding_base_url),
         embedding_model=env("EMBEDDING_MODEL", defaults.embedding_model),
         embedding_dimensions=int(env("EMBEDDING_DIMENSIONS", str(defaults.embedding_dimensions))),
+        embedding_timeout_seconds=float(
+            env("EMBEDDING_TIMEOUT_SECONDS", str(defaults.embedding_timeout_seconds))
+        ),
     )

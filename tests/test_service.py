@@ -165,3 +165,20 @@ def test_rank_score_prefers_fresh_and_important():
     minor = {"importance": 0.1, "confidence": 0.9, "updated_at": now}
     assert rank_score(0.8, fresh) > rank_score(0.8, stale)
     assert rank_score(0.8, fresh) > rank_score(0.8, minor)
+
+
+class FailingEmbedder:
+    dimensions = 64
+
+    def embed(self, texts):
+        raise TimeoutError("provider unreachable")
+
+
+def test_embedding_failure_falls_back_to_keywords(clean_db):
+    from memorybus.service import MemoryService
+
+    service = MemoryService(clean_db, FailingEmbedder())
+    created = service.upsert("projects", "User's primary project is MemoryBus", subject="MemoryBus")
+    assert created.action == "created"
+    results = service.search("MemoryBus")
+    assert [m["id"] for m in results] == [created.memory["id"]]

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import math
 import re
 import secrets
@@ -16,6 +17,8 @@ from psycopg_pool import ConnectionPool
 
 from .embeddings import Embedder
 from .secret_filter import find_secrets
+
+logger = logging.getLogger(__name__)
 
 NAMESPACES = (
     "profile",
@@ -136,9 +139,20 @@ class MemoryService:
     # ------------------------------------------------------------------ helpers
 
     def _embed(self, text: str) -> list[float] | None:
+        """Embed ``text``; None when embeddings are off or the provider fails.
+
+        Search then uses keywords only, and a memory written without a vector is still
+        found by keyword search.
+        """
         if self.embedder is None:
             return None
-        return self.embedder.embed([text])[0]
+        try:
+            return self.embedder.embed([text])[0]
+        except Exception:
+            logger.warning(
+                "Embedding request failed; falling back to keyword search", exc_info=True
+            )
+            return None
 
     def _log(self, conn, provider: str, action: str, ids: list[str], detail: dict) -> None:
         conn.execute(

@@ -20,8 +20,11 @@ class Embedder(Protocol):
 class OpenAICompatibleEmbedder:
     """SiliconFlow (Qwen3-Embedding) by default; also works with OpenAI and others."""
 
-    def __init__(self, api_key: str, base_url: str, model: str, dimensions: int):
-        self.client = OpenAI(api_key=api_key, base_url=base_url)
+    def __init__(
+        self, api_key: str, base_url: str, model: str, dimensions: int, timeout: float = 10.0
+    ):
+        # A slow or unreachable provider must not hang requests; callers fall back to keywords.
+        self.client = OpenAI(api_key=api_key, base_url=base_url, timeout=timeout, max_retries=1)
         self.model = model
         self.dimensions = dimensions
 
@@ -83,4 +86,5 @@ def build_embedder(settings: Settings) -> Embedder | None:
         base_url=settings.embedding_base_url,
         model=settings.embedding_model,
         dimensions=settings.embedding_dimensions,
+        timeout=settings.embedding_timeout_seconds,
     )
