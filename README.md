@@ -52,7 +52,12 @@ REST：
 4. **ChatGPT**：设置 → 应用与连接器 → 高级设置，打开开发者模式，然后新建连接器。URL 填 `https://<域名>/mcp`，认证方式选 OAuth，按提示跳转到 GitHub 授权即可。具体菜单名称以 ChatGPT 当前界面为准。
 5. **Muse**：把 [docs/muse-skill.md](docs/muse-skill.md) 的技能正文复制进去，并填入 token。
 
-如果 `EMBEDDING_API_KEY` 留空，服务也能启动，只是只用关键词搜索。之后补上 key，新写入的记忆就会带向量。
+如果 `EMBEDDING_API_KEY` 留空，服务也能启动，只是只用关键词搜索。之后补上 key，新写入的记忆就会带向量；之前写入的旧记忆可以用下面的命令补齐：
+
+```bash
+docker compose exec app uv run --no-sync memorybus reembed        # 只补没有向量的
+docker compose exec app uv run --no-sync memorybus reembed --all  # 换了模型后全部重算
+```
 
 ## 本地开发
 

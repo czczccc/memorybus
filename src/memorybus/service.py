@@ -534,6 +534,44 @@ class MemoryService:
             )
         return _serialize(row)
 
+    def reembed(
+        self, all_memories: bool = False, batch_size: int = 32, provider: str = "cli"
+    ) -> int:
+        """Compute embeddings for memories that lack one (or for all, after a model change).
+
+        Returns the number of memories updated.
+        """
+        if self.embedder is None:
+            raise MemoryBusError("Embeddings are not configured: set EMBEDDING_API_KEY")
+        where = "TRUE" if all_memories else "embedding IS NULL"
+        with self.pool.connection() as conn:
+            rows = conn.execute(
+                f"SELECT id, subject, content FROM memories WHERE {where} ORDER BY created_at"
+            ).fetchall()
+        updated = 0
+        for start in range(0, len(rows), batch_size):
+            batch = rows[start : start + batch_size]
+            texts = [
+                f"{r['subject']}: {r['content']}" if r["subject"] else r["content"] for r in batch
+            ]
+            vectors = self.embedder.embed(texts)
+            with self.pool.connection() as conn:
+                for row, vector in zip(batch, vectors, strict=True):
+                    conn.execute(
+                        "UPDATE memories SET embedding = %s WHERE id = %s", (vector, row["id"])
+                    )
+            updated += len(batch)
+        if updated:
+            with self.pool.connection() as conn:
+                self._log(
+                    conn,
+                    provider,
+                    "REEMBED",
+                    [r["id"] for r in rows],
+                    {"all": all_memories, "count": updated},
+                )
+        return updated
+
     # ------------------------------------------------------------------ export
 
     def events(self, limit: int = 50) -> list[dict[str, Any]]:
