@@ -307,8 +307,9 @@ class MemoryService:
                     # Keyword hits blend with (never replace) semantic similarity.
                     relevance[row["id"]] = max(relevance.get(row["id"], 0.0), 0.3 + 0.6 * hit)
 
+            # Vector search always returns its nearest rows; drop those with no relevance at all.
             ranked = sorted(
-                candidates.values(),
+                (r for r in candidates.values() if relevance[r["id"]] > 0),
                 key=lambda r: rank_score(relevance[r["id"]], r),
                 reverse=True,
             )[:limit]

@@ -182,3 +182,10 @@ def test_embedding_failure_falls_back_to_keywords(clean_db):
     assert created.action == "created"
     results = service.search("MemoryBus")
     assert [m["id"] for m in results] == [created.memory["id"]]
+
+
+def test_search_drops_unrelated_vector_hits(service):
+    service.upsert("projects", "User's primary project is MemoryBus", subject="primary project")
+    service.upsert("preferences", "User prefers uv for Python projects")
+    results = service.search("MemoryBus")
+    assert [m["subject"] for m in results] == ["primary project"]
