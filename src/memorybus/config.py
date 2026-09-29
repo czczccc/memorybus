@@ -31,7 +31,7 @@ class Settings:
     # Embeddings (OpenAI-compatible API, SiliconFlow by default)
     embedding_api_key: str | None = None
     embedding_base_url: str = "https://api.siliconflow.cn/v1"
-    embedding_model: str = "Qwen/Qwen3-Embedding-8B"
+    embedding_model: str = "Qwen/Qwen3-VL-Embedding-8B"
     embedding_dimensions: int = 1024
     embedding_timeout_seconds: float = 10.0
 
