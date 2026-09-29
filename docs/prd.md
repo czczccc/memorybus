@@ -1,7 +1,7 @@
 # MemoryBus — Product Requirements Document
 
 **Version:** 0.1  
-**Status:** Draft / MVP  
+**Status:** MVP 已完成（2026-09-29），ChatGPT 与 Muse 均已实测通过  
 **Product Type:** Personal AI Infrastructure  
 **Repository:** `memorybus`
 
@@ -533,9 +533,33 @@ Tools：
 memory_bootstrap
 memory_search
 memory_get
+memory_list
 memory_upsert
 memory_delete
 memory_recent
+```
+
+地址：`https://<域名>/mcp`（Streamable HTTP）。
+
+认证：OAuth 2.1，由服务端代理 GitHub 登录，只放行 `ALLOWED_GITHUB_LOGINS` 中的账号。ChatGPT 连接器在首次连接时完成授权。
+
+## 11.1 REST API
+
+给不支持 MCP 的客户端（例如 Muse 技能、脚本）使用，与 MCP 共用同一套 Memory Core 和存储。
+
+认证：`Authorization: Bearer <MEMORYBUS_API_TOKEN>`。可选请求头 `X-MemoryBus-Client: <名称>`，写入事件日志。
+
+```text
+GET    /v1/memory/bootstrap
+GET    /v1/memory/search?q=
+GET    /v1/memory?namespace=
+GET    /v1/memory/recent
+GET    /v1/memory/{id}
+POST   /v1/memory
+PUT    /v1/memory/{id}
+DELETE /v1/memory/{id}
+GET    /v1/memory/events
+GET    /v1/memory/export?format=json|md
 ```
 
 MCP Client 可以包括：
@@ -704,7 +728,16 @@ MemoryBus 默认禁止保存：
 - SSH Private Key
 - Recovery Phrase
 
-Secret Detector 应在 Memory Write Pipeline 前执行。
+Secret Detector 应在 Memory Write Pipeline 前执行，并且在调用 Embedding API 之前执行，保证疑似密钥不会发送给第三方。
+
+接口认证：
+
+```text
+MCP   → OAuth 2.1（GitHub 登录，账号白名单）
+REST  → Bearer Token
+```
+
+未配置 OAuth 时，服务拒绝在非 localhost 地址上开放 `/mcp`。
 
 ```text
 Candidate
@@ -747,6 +780,17 @@ pgvector 用于：
 semantic retrieval
 ```
 
+Embedding：
+
+```text
+Provider   = 硅基流动 SiliconFlow（OpenAI 兼容接口）
+Model      = Qwen/Qwen3-VL-Embedding-8B
+Dimensions = 1024
+Timeout    = 10s，超时或失败时回退到关键词检索
+```
+
+向量维度在建表时固定，更换模型或维度后需执行 `memorybus reembed --all`。未配置 Embedding 时写入的记忆没有向量，配置后执行 `memorybus reembed` 补齐。
+
 ---
 
 # 18. Architecture
@@ -756,10 +800,13 @@ semantic retrieval
 
       ChatGPT   Muse   Claude   Codex   Pi
           │       │       │       │      │
-          └───────┴───────┴───────┴──────┘
-                          │
-                         MCP
-                          │
+          └───┬───┴───┬───┴───────┴──────┘
+              │       │
+     MCP + OAuth    REST + Bearer Token
+     (ChatGPT 等)    (Muse 技能等)
+              │       │
+              └───┬───┘
+                  │
                  ┌────────▼────────┐
                  │   MemoryBus     │
                  │      API        │
@@ -781,7 +828,7 @@ semantic retrieval
 
 # 19. MVP Scope
 
-Version 0.1 只完成：
+Version 0.1 只完成（以下均已实现）：
 
 - PostgreSQL memory store
 - pgvector semantic search
@@ -796,6 +843,8 @@ Version 0.1 只完成：
 - secret filtering
 - Markdown export
 - JSON export
+- REST API + Bearer Token（为 Muse 新增）
+- OAuth 2.1 via GitHub（为 ChatGPT 新增）
 
 暂时不做：
 
@@ -841,6 +890,18 @@ memorybus export
 memory.json
 memory.md
 ```
+
+```bash
+memorybus reembed [--all]
+```
+
+给没有向量的记忆补算 Embedding；`--all` 在更换模型后重算全部。
+
+```bash
+memorybus list | token | serve
+```
+
+列出记忆、生成随机 token、启动服务。
 
 ---
 
@@ -911,6 +972,8 @@ memory_search
 memory_upsert
 ```
 
+接入方式：ChatGPT 设置 → 应用与连接器 → 开发者模式 → 新建连接器，URL 填 `https://<域名>/mcp`，认证选 OAuth，按提示完成 GitHub 授权。
+
 ---
 
 # 23. Muse Integration
@@ -937,6 +1000,14 @@ Important Memory Write-back
 ```
 
 MemoryBus 不依赖 Muse 自身 Memory 的具体实现。
+
+实现方式：Muse 技能通过 REST API（Bearer Token）调用 MemoryBus，技能说明见 `docs/muse-skill.md`：
+
+```text
+新会话        → GET  /v1/memory/bootstrap
+需要历史上下文 → GET  /v1/memory/search
+重要长期信息   → POST /v1/memory
+```
 
 ---
 
@@ -1076,6 +1147,8 @@ AI 是否获得互相冲突的记忆。
 
 ## Phase 0
 
+状态：✅
+
 Repository bootstrap
 
 ```text
@@ -1087,6 +1160,8 @@ database schema
 
 ## Phase 1
 
+状态：✅
+
 Memory Core
 
 ```text
@@ -1097,6 +1172,8 @@ Namespaces
 
 ## Phase 2
 
+状态：✅
+
 Retrieval
 
 ```text
@@ -1106,6 +1183,8 @@ Ranking
 ```
 
 ## Phase 3
+
+状态：✅
 
 MCP
 
@@ -1120,6 +1199,8 @@ memory_delete
 
 ## Phase 4
 
+状态：🟡 部分完成：Secret 检测、去重合并、按 subject 替换已实现；候选提取与重要性判断暂由调用方 AI 完成
+
 Memory Intelligence
 
 实现：
@@ -1133,11 +1214,15 @@ Secret Detection
 
 ## Phase 5
 
+状态：✅
+
 ChatGPT Integration
 
 完成真实 Chat 测试。
 
 ## Phase 6
+
+状态：✅
 
 Muse Integration
 

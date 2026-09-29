@@ -189,3 +189,21 @@ def test_search_drops_unrelated_vector_hits(service):
     service.upsert("preferences", "User prefers uv for Python projects")
     results = service.search("MemoryBus")
     assert [m["subject"] for m in results] == ["primary project"]
+
+
+def test_reembed_fills_missing_vectors(clean_db):
+    from memorybus.embeddings import HashEmbedder
+    from memorybus.service import MemoryService
+
+    MemoryService(clean_db, None).upsert("preferences", "User prefers uv for Python projects")
+    service = MemoryService(clean_db, HashEmbedder(64))
+    assert service.reembed() == 1
+    assert service.reembed() == 0
+    assert service.reembed(all_memories=True) == 1
+    assert service.events()[0]["action"] == "REEMBED"
+    assert service.search("uv Python")[0]["content"] == "User prefers uv for Python projects"
+
+
+def test_reembed_requires_embedder(keyword_service):
+    with pytest.raises(MemoryBusError):
+        keyword_service.reembed()

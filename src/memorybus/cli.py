@@ -45,6 +45,11 @@ def main(argv: list[str] | None = None) -> int:
     export = sub.add_parser("export", help="Export memory.json and memory.md")
     export.add_argument("--out", default="export")
 
+    reembed = sub.add_parser("reembed", help="Add embeddings to memories that have none")
+    reembed.add_argument(
+        "--all", action="store_true", help="Recompute every embedding (after changing model)"
+    )
+
     sub.add_parser("token", help="Generate a random API token for MEMORYBUS_API_TOKEN")
 
     serve = sub.add_parser("serve", help="Run the HTTP server (MCP + REST)")
@@ -94,6 +99,9 @@ def main(argv: list[str] | None = None) -> int:
                     f"{m['id']}  [{m['namespace']}/{m['status']}] {m['subject'] or '-'}: "
                     f"{m['content']}"
                 )
+        elif args.command == "reembed":
+            count = service.reembed(all_memories=args.all)
+            print(f"Embedded {count} memories.")
         elif args.command == "export":
             out = Path(args.out)
             out.mkdir(parents=True, exist_ok=True)
